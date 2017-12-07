@@ -1,0 +1,129 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title></title>
+    <script src="Scripts/angular.js"></script>
+    <script src="Scripts/angular-resource.js"></script>
+    <script src="Scripts/angularjs-crypto.js"></script>
+    <script src="Scripts/CryptoJSCipher.js"></script>
+    <script src="Scripts/aes.js"></script>
+    <script src="Scripts/mode-ecb.js"></script>
+    <script type="text/javascript">
+        angular.module('sampleModule', ['ngResource', 'angularjs-crypto'])
+            .run(['$rootScope', 'cfCryptoHttpInterceptor', function ($rootScope, cfCryptoHttpInterceptor) {
+                cfCryptoHttpInterceptor.base64KeyFunc = function () {
+                    return $rootScope.base64Key;
+                }
+                cfCryptoHttpInterceptor.plugin = new CryptoJSCipher(CryptoJS.mode.ECB, CryptoJS.pad.Pkcs7, CryptoJS.AES)
+                cfCryptoHttpInterceptor.pattern = "content";
+            }])
+            .factory('sampleService', function ($resource) {
+                return $resource('sample', null, {
+                    get: {
+                        method: 'GET',
+                        crypt: true
+                    },
+                    post: {
+                        method: 'POST',
+                        crypt: true
+                    }
+                });
+            })
+            .factory('sampleFullEncryptService', function ($resource) {
+                return $resource('sample/full', null, {
+                    get: {
+                        method: 'GET',
+                        decryptbody: true,
+                        transformResponse: function (data, headers) {
+                            return data.slice(1, -1);
+                        }
+                    },
+                    post: {
+                        method: 'POST',
+                        fullcryptbody: true,
+                        decryptbody: true,
+                        transformRequest: function (data, headers){
+                            return '"' + data + '"';
+                        },
+                        transformResponse: function (data, headers) {
+                            return data.slice(1, -1);
+                        }
+                    }
+                });
+            })
+            .factory('sampleKeyChangeService', function ($resource) {
+                return $resource('sample/keyChange', null, {
+                    get: {
+                        method: 'GET',
+                        decryptbody: true,
+                        transformResponse: function (data, headers) {
+                            return data.slice(1, -1);
+                        }
+                    }
+                });
+            })
+            .controller('sampleController', ['$scope', 'sampleService', 'sampleFullEncryptService', 'sampleKeyChangeService',
+                function ($scope, sampleService, sampleFullEncryptService, sampleKeyChangeService) {
+                $scope.getDecryptPropertyResult = null;
+                $scope.postDecryptPropertyResult = null;
+                $scope.getFullDecryptPropertyResult = null;
+                $scope.postFullDecryptPropertyResult = null;
+                $scope.keyChangedResult = null;
+                $scope.normalBase64Key = 'YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=';
+                $scope.newBase64Key = 'MTIzNDU2YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo=';
+
+                $scope.getEncryptedProperty = function () {
+                    // Revert key back to original.
+                    $scope.$root.base64Key = $scope.normalBase64Key;
+
+                    sampleService.get(function (sample) {
+                        $scope.getDecryptPropertyResult = JSON.stringify(sample);
+                    });
+                };
+
+                $scope.postEncryptedProperty = function () {
+                    // Revert key back to original.
+                    $scope.$root.base64Key = $scope.normalBase64Key;
+
+                    sampleService.post({ name: 'Post and retrieved updated encrypted property', content: 'HttpPost - Encrypted Property Original Content' }, function (sample) {
+                        $scope.postDecryptPropertyResult = JSON.stringify(sample);
+                    });
+                };
+
+                $scope.getFullEncrypted = function () {
+                    // Revert key back to original.
+                    $scope.$root.base64Key = $scope.normalBase64Key;
+
+                    sampleFullEncryptService.get(function (sample) {
+                        $scope.getFullDecryptPropertyResult = JSON.stringify(sample);
+                    });
+                };
+
+                $scope.postFullEncrypted = function () {
+                    // Revert key back to original.
+                    $scope.$root.base64Key = $scope.normalBase64Key;
+
+                    sampleFullEncryptService.post({ name: 'Post and retrieved updated full encrypted', content: 'HttpPost - Full Body Encrypted Original Content' }, function (sample) {
+                        $scope.postFullDecryptPropertyResult = JSON.stringify(sample);
+                    });
+                };
+
+                $scope.changeKey = function () {
+                    // Change key.
+                    $scope.$root.base64Key = $scope.newBase64Key;
+
+                    sampleKeyChangeService.get(function (sample) {
+                        $scope.keyChangedResult = JSON.stringify(sample);
+                    });
+                };
+            }])
+    </script>
+</head>
+<body ng-app="sampleModule" ng-controller="sampleController">
+    <div><span>Get encrypted property: </span><br /><input type="button" value="GET" ng-click="getEncryptedProperty()" /><span ng-bind="getDecryptPropertyResult"></span></div><br />
+    <div><span>Post and retrieved updated encrypted property: </span><br /><input type="button" value="POST" ng-click="postEncryptedProperty()" /><span ng-bind="postDecryptPropertyResult"></span></div><br />
+    <div><span>Get full encrypted: </span><br /><input type="button" value="GET" ng-click="getFullEncrypted()" /><span ng-bind="getFullDecryptPropertyResult"></span></div><br />
+    <div><span>Post and retrieved updated full encrypted: </span><br /><input type="button" value="POST" ng-click="postFullEncrypted()" /><span ng-bind="postFullDecryptPropertyResult"></span></div><br />
+    <div><span>Get full encrypted with key changed: </span><br /><input type="button" value="POST" ng-click="changeKey()" /><span ng-bind="keyChangedResult"></span></div>
+</body>
+</html>
